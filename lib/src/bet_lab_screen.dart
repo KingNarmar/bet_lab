@@ -237,7 +237,7 @@ class _FlightStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final double multiplier = engine.currentMultiplier;
     final double progress =
-        ((multiplier - 1.0) / 4.0).clamp(0.0, 1.0).toDouble();
+        ((1.0 - (1.0 / multiplier)) * 0.90).clamp(0.0, 0.90).toDouble();
 
     final Alignment planeAlignment = Alignment(
       -0.82 + (1.55 * progress),
