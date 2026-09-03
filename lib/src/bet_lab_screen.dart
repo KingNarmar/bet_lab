@@ -244,6 +244,9 @@ class _FlightStage extends StatelessWidget {
       0.72 - (1.30 * progress),
     );
 
+    final bool hasCrashed =
+        !engine.isRoundRunning && engine.lastRound != null;
+
     return Container(
       height: 250,
       decoration: BoxDecoration(
@@ -264,36 +267,107 @@ class _FlightStage extends StatelessWidget {
               painter: const _TrajectoryPainter(),
             ),
           ),
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 50),
-            curve: Curves.linear,
-            alignment: planeAlignment,
-            child: Icon(
-              Icons.flight_takeoff,
-              size: 54,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 420),
+            switchInCurve: Curves.easeOutBack,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: animation,
+                  child: child,
+                ),
+              );
+            },
+            child: hasCrashed
+                ? Align(
+                    key: ValueKey<double>(engine.lastRound!.crashPoint),
+                    alignment: planeAlignment,
+                    child: _ExplosionMarker(
+                      crashPoint: engine.lastRound!.crashPoint,
+                    ),
+                  )
+                : AnimatedAlign(
+                    key: const ValueKey<String>('flying-plane'),
+                    duration: const Duration(milliseconds: 50),
+                    curve: Curves.linear,
+                    alignment: planeAlignment,
+                    child: Icon(
+                      Icons.flight_takeoff,
+                      size: 54,
+                      color:
+                          Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
           ),
           Center(
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
               padding: const EdgeInsets.symmetric(
                 horizontal: 18,
                 vertical: 10,
               ),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.28),
+                color: hasCrashed
+                    ? Colors.red.withValues(alpha: 0.78)
+                    : Colors.black.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
-                '${multiplier.toStringAsFixed(2)}x',
-                style: const TextStyle(
-                  fontSize: 46,
+                hasCrashed
+                    ? 'CRASH ${multiplier.toStringAsFixed(2)}x'
+                    : '${multiplier.toStringAsFixed(2)}x',
+                style: TextStyle(
+                  fontSize: hasCrashed ? 34 : 46,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ExplosionMarker extends StatelessWidget {
+  const _ExplosionMarker({required this.crashPoint});
+
+  final double crashPoint;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<String>('explosion-$crashPoint'),
+      tween: Tween<double>(begin: 0.55, end: 1.35),
+      duration: const Duration(milliseconds: 520),
+      curve: Curves.easeOutBack,
+      builder: (BuildContext context, double scale, Widget? child) {
+        return Transform.scale(
+          scale: scale,
+          child: child,
+        );
+      },
+      child: Container(
+        width: 88,
+        height: 88,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.orange.withValues(alpha: 0.24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.orange.withValues(alpha: 0.58),
+              blurRadius: 28,
+              spreadRadius: 8,
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.local_fire_department,
+          size: 62,
+          color: Colors.orangeAccent,
+        ),
       ),
     );
   }
@@ -335,16 +409,20 @@ class _RoundStatusCard extends StatelessWidget {
     final CrashRoundResult? lastRound = engine.lastRound;
     final String title;
     final String detail;
+    final bool showLockedCashOut =
+        engine.isRoundRunning && engine.cashOutMultiplier != null;
 
-    if (engine.isRoundRunning) {
-      if (engine.cashOutMultiplier != null) {
-        title = 'CASHED OUT';
-        detail =
-            'Return ${engine.currentPayout} at ${engine.cashOutMultiplier!.toStringAsFixed(2)}x — round still running';
-      } else {
-        title = 'ROUND RUNNING';
-        detail = 'Cash out before the crash point is reached.';
-      }
+    if (showLockedCashOut) {
+      final int net = engine.currentPayout - engine.stake;
+      final String netText = net >= 0 ? '+$net' : '$net';
+
+      title =
+          'CASHED OUT — ${engine.cashOutMultiplier!.toStringAsFixed(2)}x';
+      detail =
+          'Return ${engine.currentPayout} · Net $netText · plane still flying';
+    } else if (engine.isRoundRunning) {
+      title = 'ROUND RUNNING';
+      detail = 'Cash out before the crash point is reached.';
     } else if (lastRound == null) {
       title = 'READY';
       detail = 'Start a round to generate a hidden crash point.';
@@ -352,10 +430,14 @@ class _RoundStatusCard extends StatelessWidget {
       title = 'CRASH — ${lastRound.crashPoint.toStringAsFixed(2)}x';
 
       if (lastRound.didCashOut) {
+        final int net = lastRound.net;
+        final String netText = net >= 0 ? '+$net' : '$net';
+
         detail =
-            'Cashed out at ${lastRound.cashOutMultiplier!.toStringAsFixed(2)}x · Return ${lastRound.payout}';
+            'Your cash out stayed locked at ${lastRound.cashOutMultiplier!.toStringAsFixed(2)}x · '
+            'Return ${lastRound.payout} · Net $netText';
       } else {
-        detail = 'No cash out before the crash · Return 0';
+        detail = 'No cash out before the crash · Return 0 · Net -${lastRound.stake}';
       }
     }
 
