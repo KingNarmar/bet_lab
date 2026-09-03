@@ -74,7 +74,7 @@ void main() {
       expect(engine.sessionNet, -100);
     });
 
-    test('cash out before the crash preserves the accounting identity', () {
+    test('cash out locks payout while the round keeps running', () {
       final CrashLabEngine engine = CrashLabEngine(
         randomDouble: () => 0.75,
       );
@@ -86,6 +86,8 @@ void main() {
 
       expect(payout, 200);
       expect(engine.cashOutMultiplier, 2.0);
+      expect(engine.isRoundRunning, isTrue);
+      expect(engine.currentMultiplier, 2.0);
       expect(engine.balance, 1100);
       expect(engine.totalStaked, 100);
       expect(engine.totalReturned, 200);
@@ -95,8 +97,16 @@ void main() {
         engine.startingBalance + engine.sessionNet,
       );
 
+      engine.advanceTo(3.0);
+
+      expect(engine.isRoundRunning, isTrue);
+      expect(engine.currentMultiplier, 3.0);
+      expect(engine.cashOutMultiplier, 2.0);
+      expect(engine.currentPayout, 200);
+
       engine.advanceTo(10);
 
+      expect(engine.isRoundRunning, isFalse);
       expect(engine.lastRound!.crashPoint, 4.0);
       expect(engine.lastRound!.cashOutMultiplier, 2.0);
       expect(engine.lastRound!.payout, 200);
