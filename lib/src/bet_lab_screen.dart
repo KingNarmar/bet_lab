@@ -12,11 +12,28 @@ class BetLabScreen extends StatefulWidget {
 }
 
 class _BetLabScreenState extends State<BetLabScreen> {
-  final CrashLabEngine _engine = CrashLabEngine(
-    rtp: 1.0,
-  );
-
+  late CrashLabEngine _engine;
   Timer? _roundTimer;
+
+  CrashLabEngine _buildEngine() {
+    return CrashLabEngine(
+      // Filming control: change this value and Hot Reload.
+      rtp: 1.0,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _engine = _buildEngine();
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _roundTimer?.cancel();
+    _engine = _buildEngine();
+  }
 
   @override
   void dispose() {
@@ -437,7 +454,8 @@ class _RoundStatusCard extends StatelessWidget {
             'Your cash out stayed locked at ${lastRound.cashOutMultiplier!.toStringAsFixed(2)}x · '
             'Return ${lastRound.payout} · Net $netText';
       } else {
-        detail = 'No cash out before the crash · Return 0 · Net -${lastRound.stake}';
+        detail =
+            'No cash out before the crash · Return 0 · Net -${lastRound.stake}';
       }
     }
 
